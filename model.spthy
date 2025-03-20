@@ -34,7 +34,7 @@ rule Send:
 rule AdversarySubmit:
   [ In(m) ]
   --[ Sent($Room, $Sender, m)
-    , AdversarySubmit() ]->
+    , Compromised($Sender) ]->
   [ ToHub($Room, $Sender, m) ]
 
 rule HubProcessing:
@@ -50,7 +50,18 @@ rule HubProcessing:
   , !RoomMember($Room, $Sender)
   , !Room($Room, ~roomSecret) ]
   -->
-  [ ToMembers($Room, $Sender, <msg, server_frank, ~acceptedTimestamp, franking_integrity_check>) ]
+  [ HubSend($Room, $Sender, <msg, server_frank, ~acceptedTimestamp, franking_integrity_check>) ]
+
+rule HubSend:
+  [ HubSend($Room, $Sender, m) ]
+  -->
+  [ !HubSent($Room, $Sender, m)
+  , Out(m) ]
+
+rule MemberReceive:
+  [ !HubSent($Room, $Sender, m) ]
+  -->
+  [ MemberReceive($Room, $Sender, m) ]
 
 rule ReceiverVerification:
   let msg = <m, salt, sender_franking_tag>
@@ -60,7 +71,7 @@ rule ReceiverVerification:
       franking_tag = hmac(salt, <$Room, $Sender, m>)
       frank = <server_frank, franking_integrity_check>
   in
-  [ ToMembers($Room, $Sender, <msg, server_frank, acceptedTimestamp, hub_franking_integrity_check>)
+  [ MemberReceive($Room, $Sender, <msg, server_frank, acceptedTimestamp, hub_franking_integrity_check>)
   , !RoomMember($Room, $Receiver)
   , !Room($Room, ~roomSecret) ]
   --[ Eq(franking_integrity_check, hub_franking_integrity_check)
@@ -92,11 +103,12 @@ lemma Executability:
   "Ex r s m #a #b.
       Sent(r, s, m) @ #a
     & FrankVerified(r, s, m) @ #b
-    & (not Ex #x. AdversarySubmit() @ #x)"
+    & (not Ex p #x. Compromised(p) @ #x)"
 
 lemma Correctness:
   "All r s m #t.
-        FrankVerified(r, s, m) @ #t
-    ==> Ex #x. Sent(r, s, m) @ #x"
+          FrankVerified(r, s, m) @ #t
+    ==>   (Ex #x. Sent(r, s, m) @ #x)
+        | (Ex #x. Compromised(s) @ #x)"
 
 end
