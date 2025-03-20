@@ -1,0 +1,102 @@
+theory Franking
+begin
+
+functions: kdf/1, h/1
+
+macros: hmac(k, m) = h(k, h(k, m))
+
+restriction Eq:
+  "All #x a b. Eq(a, b) @ #x ==> a = b"
+
+rule Hub:
+  [ Fr(~hubKey) ]
+  -->
+  [ !Hub(~hubKey) ]
+
+rule Room:
+  [ Fr(~roomSecret) ]
+  -->
+  [ !Room($Room, ~roomSecret) ]
+
+rule RoomJoin:
+  [ !Room($Room, ~roomSecret) ]
+  -->
+  [ !RoomMember($Room, $A) ]
+
+rule Send:
+  let franking_tag = hmac(~salt, <$Room, $Sender, ~m>)
+      msg = <~m, ~salt, franking_tag>
+  in
+  [ !RoomMember($Room, $Sender), Fr(~salt), Fr(~m) ]
+  --[ Sent($Room, $Sender, ~m) ]->
+  [ ToHub($Room, $Sender, msg) ]
+
+rule AdversarySubmit:
+  [ In(m) ]
+  --[ Sent($Room, $Sender, m)
+    , AdversarySubmit() ]->
+  [ ToHub($Room, $Sender, m) ]
+
+rule HubProcessing:
+  let msg = <m, salt, franking_tag>
+      franking_integrity_secret = kdf(<~roomSecret, 'franking_integrity'>)
+      context = <$Sender, $Room, ~acceptedTimestamp>
+      server_frank = hmac(~hubKey, <franking_tag, context>)
+      franking_integrity_check = hmac(franking_integrity_secret, <server_frank, context>)
+  in
+  [ Fr(~acceptedTimestamp)
+  , ToHub($Room, $Sender, msg)
+  , !Hub(~hubKey)
+  , !RoomMember($Room, $Sender)
+  , !Room($Room, ~roomSecret) ]
+  -->
+  [ ToMembers($Room, $Sender, <msg, server_frank, ~acceptedTimestamp, franking_integrity_check>) ]
+
+rule ReceiverVerification:
+  let msg = <m, salt, sender_franking_tag>
+      franking_integrity_secret = kdf(<~roomSecret, 'franking_integrity'>)
+      context = <$Sender, $Room, acceptedTimestamp>
+      franking_integrity_check = hmac(franking_integrity_secret, <server_frank, context>)
+      franking_tag = hmac(salt, <$Room, $Sender, m>)
+      frank = <server_frank, franking_integrity_check>
+  in
+  [ ToMembers($Room, $Sender, <msg, server_frank, acceptedTimestamp, hub_franking_integrity_check>)
+  , !RoomMember($Room, $Receiver)
+  , !Room($Room, ~roomSecret) ]
+  --[ Eq(franking_integrity_check, hub_franking_integrity_check)
+    , Eq(franking_tag, sender_franking_tag) ]->
+  [ TagReceived(<$Room, $Sender, acceptedTimestamp, salt, m>, frank) ]
+
+rule ReportAbuse:
+  [ TagReceived(ctxt, frank) ]
+  -->
+  [ Out(<ctxt, frank>) ]
+
+rule HandleAbuse:
+  let context = <$Sender, $Room, acceptedTimestamp>
+      franking_tag = hmac(salt, <$Room, $Sender, m>)
+      server_frank = hmac(~hubKey, <franking_tag, context>)
+      franking_integrity_secret = kdf(<~roomSecret, 'franking_integrity'>)
+      franking_integrity_check = hmac(franking_integrity_secret, <server_frank, context>)
+  in
+  [ In(<<$Room, $Sender, acceptedTimestamp, salt, m>, <rep_server_frank, rep_franking_integrity_check>>)
+  , !Hub(~hubKey)
+  , !Room($Room, ~roomSecret) ]
+  --[ Eq(franking_integrity_check, rep_franking_integrity_check)
+    , Eq(server_frank, rep_server_frank)
+    , FrankVerified($Room, $Sender, m) ]->
+  []
+
+lemma Executability:
+  exists-trace
+  "Ex r s m #a #b.
+      Sent(r, s, m) @ #a
+    & FrankVerified(r, s, m) @ #b
+    & (not Ex #x. AdversarySubmit() @ #x)"
+
+lemma Correctness:
+  "All r s m #t.
+        FrankVerified(r, s, m) @ #t
+    ==> Ex #x. Sent(r, s, m) @ #x"
+
+end
