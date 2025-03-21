@@ -13,4 +13,14 @@ Assumptions and abstractions:
   - The hub key and room secrets are modelled as long-term secrets.
 
 Under the assumptions from above, I was able to prove a "correctness" property.
-That is, whenever a hub receives an abuse report and successfully verifies it, the accused sender did indeed send the respective message.
+That is, whenever a hub receives an abuse report and successfully verifies it, and at least one honest client has processed the message, the accused sender did indeed send the respective message.
+
+The assumption on honest-client processing is required because the following can happen.
+1. A malicious client submits a message `m1` to the hub with a franking tag for message `m2`.
+2. The hub accepts the message and relays it to clients because it does not verify the franking tag.
+3. Honest clients will reject the message because the they cannot verify the franking tag.
+4. Now, the initial, malicious client can be accused of having sent `m2`, which they have not.
+They have sent `m1`.
+This way, a malicious client can try denying having sent a message they were accused of having sent, but they can only do so by claiming they did not follow the protocol.
+
+The above does not seem to be desirable, but also not a major concern.
