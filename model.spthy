@@ -28,7 +28,7 @@ rule Send:
       msg = <~m, ~salt, franking_tag>
   in
   [ !RoomMember($Room, $Sender), Fr(~salt), Fr(~m) ]
-  --[ Sent($Room, $Sender, ~m) ]->
+  --[ Sent($Room, $Sender, msg) ]->
   [ ToHub($Room, $Sender, msg) ]
 
 rule AdversarySubmit:
@@ -76,7 +76,7 @@ rule ReceiverVerification:
   , !Room($Room, ~roomSecret) ]
   --[ Eq(franking_integrity_check, hub_franking_integrity_check)
     , Eq(franking_tag, sender_franking_tag)
-    , Accept(m) ]->
+    , Accept($Room, $Sender, m) ]->
   [ TagReceived(<$Room, $Sender, acceptedTimestamp, salt, m>, frank) ]
 
 rule ReportAbuse:
@@ -101,15 +101,15 @@ rule HandleAbuse:
 
 lemma Executability:
   exists-trace
-  "Ex r s m #a #b.
-      Sent(r, s, m) @ #a
+  "Ex r s m salt tag #a #b.
+      Sent(r, s, <m, salt, tag>) @ #a
     & FrankVerified(r, s, m) @ #b
     & (not Ex p #x. Compromised(p) @ #x)"
 
 lemma Correctness:
   "All r s m #t1 #t2.
           FrankVerified(r, s, m) @ #t1
-        & Accept(m) @ #t2
-    ==> Ex #x. Sent(r, s, m) @ #x"
+        & Accept(r, s, m) @ #t2
+    ==> (Ex salt tag #x. Sent(r, s, <m, salt, tag>) @ #x)"
 
 end
