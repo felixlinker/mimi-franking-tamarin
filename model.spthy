@@ -75,7 +75,8 @@ rule ReceiverVerification:
   , !RoomMember($Room, $Receiver)
   , !Room($Room, ~roomSecret) ]
   --[ Eq(franking_integrity_check, hub_franking_integrity_check)
-    , Eq(franking_tag, sender_franking_tag) ]->
+    , Eq(franking_tag, sender_franking_tag)
+    , Accept(m) ]->
   [ TagReceived(<$Room, $Sender, acceptedTimestamp, salt, m>, frank) ]
 
 rule ReportAbuse:
@@ -106,9 +107,9 @@ lemma Executability:
     & (not Ex p #x. Compromised(p) @ #x)"
 
 lemma Correctness:
-  "All r s m #t.
-          FrankVerified(r, s, m) @ #t
-    ==>   (Ex #x. Sent(r, s, m) @ #x)
-        | (Ex #x. Compromised(s) @ #x)"
+  "All r s m #t1 #t2.
+          FrankVerified(r, s, m) @ #t1
+        & Accept(m) @ #t2
+    ==> Ex #x. Sent(r, s, m) @ #x"
 
 end
