@@ -37,6 +37,17 @@ rule AdversarySubmit:
     , Compromised($Sender) ]->
   [ ToHub($Room, $Sender, m) ]
 
+rule ClientSent:
+  [ ToHub($Room, $Sender, m) ]
+  -->
+  [ !ClientSent($Room, $Sender, m)
+  , Out(m) ]
+
+rule HubReceive:
+  [ !ClientSent($Room, $Sender, m) ]
+  -->
+  [ HubReceive($Room, $Sender, m) ]
+
 rule HubProcessing:
   let msg = <m, salt, franking_tag>
       franking_integrity_secret = kdf(<~roomSecret, 'franking_integrity'>)
@@ -45,7 +56,7 @@ rule HubProcessing:
       franking_integrity_check = hmac(franking_integrity_secret, <server_frank, context>)
   in
   [ Fr(~acceptedTimestamp)
-  , ToHub($Room, $Sender, msg)
+  , HubReceive($Room, $Sender, msg)
   , !Hub(~hubKey)
   , !RoomMember($Room, $Sender)
   , !Room($Room, ~roomSecret) ]
