@@ -23,3 +23,11 @@ They have sent `m1`.
 This way, a malicious client can try denying having sent a message they were accused of having sent, but they can only do so by claiming they did not follow the protocol.
 
 The above does not seem to be desirable, but also not a major concern.
+
+## Verifying Proofs
+
+To verify proofs, install [Tamarin](https://tamarin-prover.com/manual/master/book/002_installation.html) and execute:
+
+```sh
+tamarin-prover --prove model.spthy
+```
