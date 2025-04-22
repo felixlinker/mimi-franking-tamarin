@@ -4,9 +4,9 @@ This repository contains a preliminary, formal analysis of the message franking 
 The model is modelled for the Tamarin prover.
 
 Assumptions and abstractions:
-  - Participants have an authenticated channel to the hub.
+  - Participants have an authenticated channel to the hub and the hub honestly forwards received messages to room members.
     No encryption of the MIMI protocol is modelled.
-  - The adversary has access to all messages sent in a room.
+  - The adversary can read all messages sent in a room.
   - Any participant may become compromised.
     When that happens, the adversary can send messages in that participant's name.
   - The hub key and room secrets are modelled as long-term secrets.
